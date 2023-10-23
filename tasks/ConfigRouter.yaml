@@ -1,0 +1,63 @@
+# VyOS 1.3 configuration
+---
+- name: Configure system
+  vyos.vyos.vyos_config:
+    lines:
+      - set system host-name "{{ system.hostname }}"
+      - set system domain-name "{{ system.domain_name }}"
+      - set system login banner post-login "{{ login_banner }}"
+      - set system option ctrl-alt-delete ignore
+      - set system option reboot-on-panic
+      - set system option startup-beep
+      - set system option keyboard-layout us
+      - set system option performance latency
+      - set system time-zone US/Central
+
+- name: Set DNS Servers
+  vyos.vyos.vyos_config:
+    lines:
+      - set system name-server "{{ item }}"
+  loop: "{{ system.name_servers }}"
+
+- name: Set NTP Servers
+  vyos.vyos.vyos_config:
+    lines:
+      - set system ntp server "{{ item }}"
+  loop: "{{ system.ntp_servers }}"
+
+- name: Configure users
+  vyos.vyos.vyos_config:
+    lines:
+      - set system login user "{{ item.name }}" full-name "{{ item.full_name }}"
+      - set system login user vyos authentication public-keys ssh type ed25519
+      - set system login user vyos authentication public-keys ssh key "{{ item.public_key }}"
+  loop: "{{ users }}"
+
+- name: Define bond0
+  vyos.vyos.vyos_config:
+    lines:
+      - set interface bonding bond0 description 'Routing Backbone'
+      - set interface bonding bond0 hash-policy 'layer2-3'
+      - set interface bonding bond0 member interface 'eth2'
+      - set interface bonding bond0 member interface 'eth3'
+      - set interface bonding bond0 mode '802.3ad'
+
+- name: Set VLANs on bond0
+  vyos.vyos.vyos_config:
+    lines:
+      - set interface bonding bond0 vif "{{ item.id }}" description '"{{ item.description }}"'
+      - set interface bonding bond0 vif "{{ item.id }}" address '"{{ item.address }}"'
+  loop: "{{ system.interfaces.bond0.vlans }}"
+
+- name: Configure Ethernet devices
+  block:
+    - name: Define Ethernet device
+      vyos.vyos.vyos_config:
+        lines:
+          - set interface ethernet "{{ item.name }}" description "{{ item.description }}"
+          - set interface ethernet "{{ item.name }}" hw-id "{{ item.hwid }}"
+    - name: Set IPv4 Addresses on Ethernet devices
+      vyos.vyos.vyos_config:
+        lines:
+          - set interface ethernet "{{ item.name }}" address "{{ item.address }}"
+      loop: "{{ system.interfaces.ethernet }}"
